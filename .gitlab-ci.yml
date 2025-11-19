@@ -1,0 +1,498 @@
+image: comp23102025/2310-assignment-1
+
+variables:
+  backticks: "```" 
+  single_backtick: "`" 
+
+stages:
+  - filecheck
+  - build
+  - test
+  - render
+
+
+statement-of-originality:
+  image: comp23102025/2310-assignment-1
+  stage: filecheck
+  allow_failure: true
+  tags:
+    - comp2310
+  artifacts:
+    when: always
+    paths:
+      - references.md
+    reports:
+      dotenv: student.env
+  script:
+    - python3 /scripts/validate.py get-student statement-of-originality.md
+    - python3 /scripts/validate.py get-content statement-of-originality.md -C references.md
+    - python3 /scripts/validate.py schema ./statement-of-originality.md https://comp.anu.edu.au/courses/comp2310/assets/schemas/soo-md.json
+
+build:mymalloc:
+  allow_failure: true
+  stage: build
+  tags:
+    - comp2310
+  artifacts:
+    when: always
+    paths:
+      - tests/
+      - internal-tests/
+      - out/libmymalloc.so
+      - test.py
+  script:
+    - cp -f -r /data/assignment-1/tests "$CI_PROJECT_DIR/tests"
+    - cp -f -r /data/assignment-1/internal-tests "$CI_PROJECT_DIR/internal-tests"
+    - cp -f -r /data/assignment-1/base/test.py "$CI_PROJECT_DIR/test.py"
+    - make mymalloc
+
+build:mygc:
+  allow_failure: true
+  stage: build
+  tags:
+    - comp2310
+  artifacts:
+    when: always
+    paths:
+      - tests/
+      - internal-tests/
+      - out/libmygc.so
+  script:
+    - make MALLOC=mygc
+
+
+.test:run-test:
+  allow_failure: true
+  stage: test
+  needs:
+    - job: build:mymalloc
+      artifacts: true
+  tags:
+    - comp2310
+  script:
+    - touch "${TEST_NAME}-results.txt"
+    - printf "%s\n" "Running test ${TEST_NAME}"
+    - RESULT=0
+    - python3 test.py -t "${TEST_NAME}" > "${TEST_NAME}-results.txt" 2>&1 || RESULT=$?
+    - cat "${TEST_NAME}-results.txt"
+    - if [ "${RESULT}" != "0" ]; then  
+    -  exit 1
+    - fi
+
+test:align:
+  allow_failure: true
+  timeout: 5 minutes
+  stage: test
+  tags:
+    - comp2310
+  needs:
+    - job: build:mymalloc
+      artifacts: true
+  variables:
+    TEST_NAME: "align"
+  artifacts:
+    when: always
+    paths: 
+      - "align-results.txt"
+  extends: .test:run-test
+
+test:all_lists:
+  allow_failure: true
+  timeout: 5 minutes
+  stage: test
+  tags:
+    - comp2310
+  needs:
+    - job: build:mymalloc
+      artifacts: true
+  variables:
+    TEST_NAME: "all_lists"
+  artifacts:
+    when: always
+    paths: 
+      - "all_lists-results.txt"
+  extends: .test:run-test
+
+test:arrays:
+  allow_failure: true
+  timeout: 5 minutes
+  stage: test
+  tags:
+    - comp2310
+  needs:
+    - job: build:mymalloc
+      artifacts: true
+  variables:
+    TEST_NAME: "arrays"
+  artifacts:
+    when: always
+    paths: 
+      - "arrays-results.txt"
+  extends: .test:run-test
+
+test:exact:
+  allow_failure: true
+  timeout: 5 minutes
+  stage: test
+  tags:
+    - comp2310
+  needs:
+    - job: build:mymalloc
+      artifacts: true
+  variables:
+    TEST_NAME: "exact"
+  artifacts:
+    when: always
+    paths: 
+      - "exact-results.txt"
+  extends: .test:run-test
+
+test:free_test:
+  allow_failure: true
+  timeout: 5 minutes
+  stage: test
+  tags:
+    - comp2310
+  needs:
+    - job: build:mymalloc
+      artifacts: true
+  variables:
+    TEST_NAME: "free_test"
+  artifacts:
+    when: always
+    paths: 
+      - "free_test-results.txt"
+  extends: .test:run-test
+
+test:large:
+  allow_failure: true
+  timeout: 5 minutes
+  stage: test
+  tags:
+    - comp2310
+  needs:
+    - job: build:mymalloc
+      artifacts: true
+  variables:
+    TEST_NAME: "large"
+  artifacts:
+    when: always
+    paths: 
+      - "large-results.txt"
+  extends: .test:run-test
+
+test:malloc_too_large:
+  allow_failure: true
+  timeout: 5 minutes
+  stage: test
+  tags:
+    - comp2310
+  needs:
+    - job: build:mymalloc
+      artifacts: true
+  variables:
+    TEST_NAME: "malloc_too_large"
+  artifacts:
+    when: always
+    paths: 
+      - "malloc_too_large-results.txt"
+  extends: .test:run-test
+
+test:malloc_zero:
+  allow_failure: true
+  timeout: 5 minutes
+  stage: test
+  tags:
+    - comp2310
+  needs:
+    - job: build:mymalloc
+      artifacts: true
+  variables:
+    TEST_NAME: "malloc_zero"
+  artifacts:
+    when: always
+    paths: 
+      - "malloc_zero-results.txt"
+  extends: .test:run-test
+
+test:random_free:
+  allow_failure: true
+  timeout: 5 minutes
+  stage: test
+  tags:
+    - comp2310
+  needs:
+    - job: build:mymalloc
+      artifacts: true
+  variables:
+    TEST_NAME: "random_free"
+  artifacts:
+    when: always
+    paths: 
+      - "random_free-results.txt"
+  extends: .test:run-test
+
+test:random:
+  allow_failure: true
+  timeout: 5 minutes
+  stage: test
+  tags:
+    - comp2310
+  needs:
+    - job: build:mymalloc
+      artifacts: true
+  variables:
+    TEST_NAME: "random"
+  artifacts:
+    when: always
+    paths: 
+      - "random-results.txt"
+  extends: .test:run-test
+
+test:simple1:
+  allow_failure: true
+  timeout: 5 minutes
+  stage: test
+  tags:
+    - comp2310
+  needs:
+    - job: build:mymalloc
+      artifacts: true
+  variables:
+    TEST_NAME: "simple1"
+  artifacts:
+    when: always
+    paths: 
+      - "simple1-results.txt"
+  extends: .test:run-test
+
+test:simple2:
+  allow_failure: true
+  timeout: 5 minutes
+  stage: test
+  tags:
+    - comp2310
+  needs:
+    - job: build:mymalloc
+      artifacts: true
+  variables:
+    TEST_NAME: "simple2"
+  artifacts:
+    when: always
+    paths: 
+      - "simple2-results.txt"
+  extends: .test:run-test
+
+test:internal:check-allocated:
+  allow_failure: true
+  timeout: 5 minutes
+  stage: test
+  tags:
+    - comp2310
+  needs:
+    - job: build:mymalloc
+      artifacts: true
+  variables:
+    TEST_NAME: "check-allocated"
+  artifacts:
+    when: always
+    paths: 
+      - "check-allocated-results.txt"
+  extends: .test:run-test
+
+test:internal:memset:
+  allow_failure: true
+  timeout: 5 minutes
+  stage: test
+  tags:
+    - comp2310
+  needs:
+    - job: build:mymalloc
+      artifacts: true
+  variables:
+    TEST_NAME: "memset"
+  artifacts:
+    when: always
+    paths: 
+      - "memset-results.txt"
+  extends: .test:run-test
+
+test:internal:split-block:
+  allow_failure: true
+  timeout: 5 minutes
+  stage: test
+  tags:
+    - comp2310
+  needs:
+    - job: build:mymalloc
+      artifacts: true
+  variables:
+    TEST_NAME: "split-block"
+  artifacts:
+    when: always
+    paths: 
+      - "split-block-results.txt"
+  extends: .test:run-test
+
+test:bench:
+  allow_failure: true
+  timeout: 5 minutes
+  stage: test
+  tags:
+    - comp2310
+  needs:
+    - job: build:mymalloc
+      artifacts: true
+  artifacts:
+    when: always
+    paths: 
+      - "benchmark-results.txt"
+  script:
+    - make clean
+    - make bench RELEASE=1
+    - RESULT=0
+    - ./bench/benchmark > benchmark-results.txt 2>&1 || RESULT=$?
+    - cat benchmark-results.txt
+    - if [ "${RESULT}" != "0" ]; then
+    -   exit 1;
+    - fi
+
+report:
+  stage: filecheck
+  allow_failure: true
+  tags:
+    - comp2310
+  script:
+    - python3 /scripts/validate.py exists report.md
+    - var="$(cat report.md | wc -w)"
+    - >
+      echo "Word Count: $var"
+    - > 
+      if (( $var > 300)); then
+          if (( $var > 1200)); then
+            echo "Your report should be < 1000 words!";
+            exit 1;
+          else
+            exit 0;
+          fi
+      else
+        echo "Your report should probably be more than 300 words!";
+        exit 1;
+      fi
+
+pdf:
+  stage: render
+  tags:
+    - comp2310
+  image:
+    name: comp23002024/comp2300-md2pdf
+  needs:
+    - job: test:align
+      artifacts: true
+    - job: test:all_lists
+      artifacts: true
+    - job: test:arrays
+      artifacts: true
+    - job: test:bench
+      artifacts: true
+    - job: test:exact
+      artifacts: true
+    - job: test:large
+      artifacts: true
+    - job: test:malloc_too_large
+      artifacts: true
+    - job: test:malloc_zero
+      artifacts: true
+    - job: test:random
+      artifacts: true
+    - job: test:random_free
+      artifacts: true
+    - job: test:simple1
+      artifacts: true
+    - job: test:simple2
+      artifacts: true
+    - job: test:internal:check-allocated
+      artifacts: true
+    - job: test:internal:memset
+      artifacts: true
+    - job: test:internal:split-block
+      artifacts: true
+    - job: statement-of-originality
+      artifacts: true
+  variables:
+    PDF_NAME: 'assignment-1-results.pdf'
+  artifacts:
+    paths:
+      - $PDF_NAME
+    when: always
+  script:
+    - touch pdf.md
+
+    # Build pdf.md
+    ## Preamble
+    - echo "---" > pdf.md
+    - echo "pdf_options:" >> pdf.md
+    - |
+      echo "  displayHeaderFooter: false" >> pdf.md
+    - |
+      echo "  format: A4" >> pdf.md
+    - |
+      echo "  margin: 25mm" >> pdf.md
+    - |
+      echo "  printBackground: true" >> pdf.md
+    - |
+      echo "css: |-" >> pdf.md
+    - |
+      echo "  .page-break { page-break-after: always; }"
+    - echo "---" >> pdf.md
+
+    - echo $PDF_NAME
+    - echo $STUDENT_NAME
+    - echo $STUDENT_UID
+    - cat references.md
+
+    - echo "## Student Details" >> pdf.md
+    - > 
+      echo "- **uid**: $STUDENT_UID" >> pdf.md
+    - > 
+      echo "- **name**: $STUDENT_NAME" >> pdf.md
+    - echo "" >> pdf.md
+
+    # Report 
+    - echo "<div class='page-break'> </div>" >> pdf.md
+    - echo "" >> pdf.md
+    - cat report.md >> pdf.md
+    - echo "" >> pdf.md
+    - echo "" >> pdf.md
+
+    ## References
+    - echo "" >> pdf.md
+    - echo "<div class='page-break'> </div>" >> pdf.md
+    - echo "" >> pdf.md
+    - cat references.md >> pdf.md
+    - echo "" >> pdf.md
+
+    - echo "<div class='page-break'> </div>" >> pdf.md
+
+    - echo "## Test Results" >> pdf.md
+
+    - TEST_NAMES="align all_lists arrays exact free_test large malloc_too_large malloc_zero random_free random simple1 simple2 check-allocated memset split-block benchmark"
+    - for test_name in ${TEST_NAMES}; do
+    -   RESULT_FILE="${test_name}-results.txt"
+    -   touch ${RESULT_FILE}
+    -   printf "%s\n\n" "## Test ${test_name}" >> pdf.md
+    -   printf "%s\n" "${backticks}" >> pdf.md
+    -   cat ${RESULT_FILE} >> pdf.md
+    -   printf "%s\n\n" "${backticks}" >> pdf.md
+    - done
+    - printf "\n\n" >> pdf.md
+
+    - cat pdf.md
+    # Render
+    - | 
+      md-to-pdf --launch-options '{ "args": ["--no-sandbox"] }' \
+                --highlight-style 'vs2015' \
+                --document-title "$assignment_name" \
+                --css 'body { font-family: helvetica }'  \
+                pdf.md
+    - mv pdf.pdf "$PDF_NAME"
