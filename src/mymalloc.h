@@ -33,6 +33,12 @@ struct Block {
   bool allocated;
 };
 
+typedef struct Arena{
+  size_t size;
+  struct Arena * next;
+} Arena;
+
+
 // Word alignment
 extern const size_t kAlignment;
 // Minimum allocation size (1 word)
@@ -44,8 +50,11 @@ extern const size_t kMaxAllocationSize;
 // Memory size that is mmapped (256 MB)
 extern const size_t kMemorySize;
 
-void *my_malloc(size_t size);
-void my_free(void *p);
+#define alloc   alloc_impl
+#define release release_impl
+
+void *alloc_impl(size_t size);
+void release_impl(void *p);
 
 /* Helper functions you are required to implement for internal testing. */
 
