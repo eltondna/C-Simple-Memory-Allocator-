@@ -50,14 +50,10 @@ extern const size_t kMaxAllocationSize;
 // Memory size that is mmapped (256 MB)
 extern const size_t kMemorySize;
 
-#define alloc   alloc_impl
-#define release release_impl
-
-void *alloc_impl(size_t size);
-void release_impl(void *p);
+void *my_malloc(size_t size);
+void my_free(void *p);
 
 /* Helper functions you are required to implement for internal testing. */
-
 int is_free(Block *block);
 size_t block_size(Block *block);
 

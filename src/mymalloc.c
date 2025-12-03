@@ -133,34 +133,30 @@ static void memoryAllocation(size_t size){
 }
 
 
-void * alloc_impl(size_t size){
-  return NULL;
+void *my_malloc(size_t size) {
+  if (size == 0)
+      return NULL;
+
+  if (size < kMinAllocationSize)
+    size = kMinAllocationSize;
+  size_t target_size = memAlign(size, kAlignment);
+
+  if (target_size > kMaxAllocationSize)
+      return NULL;
+  if (!freeList){
+      size_t alloc_size = 0;
+      // ! 1. < 256MB
+      if (target_size < (kMemorySize - kMetadataSize))
+          alloc_size = kMemorySize;
+      // ! 2. < 512 MB
+      else if (target_size < (kMaxAllocationSize - kMetadataSize))
+          alloc_size = kMaxAllocationSize;
+      // ! 3. 512 MB
+      else alloc_size = (kMaxAllocationSize << 1);
+      memoryAllocation(alloc_size);
+  }
+  return searchBlock(target_size);
 }
-
-// void *alloc(size_t size) {
-//   if (size == 0)
-//       return NULL;
-
-//   if (size < kMinAllocationSize)
-//     size = kMinAllocationSize;
-//   size_t target_size = memAlign(size, kAlignment);
-
-//   if (target_size > kMaxAllocationSize)
-//       return NULL;
-//   if (!freeList){
-//       size_t alloc_size = 0;
-//       // ! 1. < 256MB
-//       if (target_size < (kMemorySize - kMetadataSize))
-//           alloc_size = kMemorySize;
-//       // ! 2. < 512 MB
-//       else if (target_size < (kMaxAllocationSize - kMetadataSize))
-//           alloc_size = kMaxAllocationSize;
-//       // ! 3. 512 MB
-//       else alloc_size = (kMaxAllocationSize << 1);
-//       memoryAllocation(alloc_size);
-//   }
-//   return searchBlock(target_size);
-// }
 
 
 void coalesce(){
@@ -189,31 +185,27 @@ void coalesce(){
     }
 }
 
-// void release(void *ptr) {
-//   if (!ptr) 
-//       return;
-//   Block * m_data = (Block *)((char *)ptr - kMetadataSize);
-//   if (!m_data->allocated)
-//       return;
+void my_free(void *ptr) {
+  if (!ptr) 
+      return;
+  Block * m_data = (Block *)((char *)ptr - kMetadataSize);
+  if (!m_data->allocated)
+      return;
 
-//   // ! 1. Insert the free block into head of the free list
-//   m_data->allocated = false;
-//   m_data->prev      = NULL;
-//   m_data->next      = NULL;
+  // ! 1. Insert the free block into head of the free list
+  m_data->allocated = false;
+  m_data->prev      = NULL;
+  m_data->next      = NULL;
 
-//   // ! 2. Check free list empty
-//   if (freeList){
-//       freeList->prev = m_data;
-//       m_data->next     = freeList;
-//   }
-//   freeList = m_data;
+  // ! 2. Check free list empty
+  if (freeList){
+      freeList->prev = m_data;
+      m_data->next     = freeList;
+  }
+  freeList = m_data;
   
-//   // ! 3. Linear Coelasce
-//   coalesce();
-//   return;
-// }
-
-void release_impl(void *ptr) {
+  // ! 3. Linear Coelasce
+  coalesce();
   return;
 }
 
