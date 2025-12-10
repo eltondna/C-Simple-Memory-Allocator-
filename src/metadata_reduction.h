@@ -1,5 +1,5 @@
-#ifndef MYMALLOC_HEADER
-#define MYMALLOC_HEADER
+#ifndef METADATA_REDUCTION_H
+#define METADATA_REDUCTION_H
 
 #include <stddef.h>
 #include <stdio.h>
@@ -17,7 +17,6 @@
 #define ADD_BYTES(ptr, n) ((void *) (((char *) (ptr)) + (n)))
 #define SET_ALLOC_BIT(ptr) (ptr->size |= 1)
 #define CLEAR_ALLOC_BIT(ptr) (ptr->size &= (~1))
-#define GET_SIZE(ptr) ((size_t) (ptr->size & (~7)))
 
 
 /** This is the Block struct, which contains all metadata needed for your 

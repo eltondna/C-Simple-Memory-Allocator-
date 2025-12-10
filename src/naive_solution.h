@@ -15,9 +15,6 @@
 #define N_LISTS 25
 
 #define ADD_BYTES(ptr, n) ((void *) (((char *) (ptr)) + (n)))
-#define SET_ALLOC_BIT(ptr) (ptr->size |= 1)
-#define CLEAR_ALLOC_BIT(ptr) (ptr->size &= (~1))
-#define GET_SIZE(ptr) ((size_t) (ptr->size & (~7)))
 
 
 /** This is the Block struct, which contains all metadata needed for your 
@@ -32,6 +29,8 @@ struct Block {
   // Next and Prev blocks
   Block *next;
   Block *prev;
+  // Is the block allocated or not?
+  bool allocated;
 };
 
 typedef struct Arena{

@@ -10,7 +10,6 @@ int main(void) {
       pointers[j] = mallocing(sizes[j]);
       memset(pointers[j], j, sizes[j]);
     }
-
     if (i % 2 == 0) {
       for (int j = i - 1; j >= 0; j--)
         freeing(pointers[j]);
