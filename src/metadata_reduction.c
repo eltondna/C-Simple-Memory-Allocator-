@@ -1,18 +1,22 @@
-#include "metadata_reduction.h"
+#include "mymalloc.h"
 
 // Word alignment
 const size_t kAlignment = sizeof(size_t);
 // Minimum allocation size (1 word)
 const size_t kMinAllocationSize = kAlignment;
-// Size of meta-data per Block
+// Size of unallocated meta-data per free Block
 const size_t kMetadataSize = sizeof(Block);
+// Size of allocated meta-data per allocated Block
+const size_t kAllocMetadataSize = sizeof(size_t);
 // Maximum allocation size (512 MB)
 const size_t kMaxAllocationSize = (512ull << 20) - kMetadataSize;
 // Memory size that is mmapped (256 MB)
 const size_t kMemorySize = (256ull << 20);
 
 /* Notes
-    This is the metadata-reduction + constant coelesce
+    Metadata-reduction : 
+    1. Use last bit of size field to indicate allocated or not
+    2. The next and prev pointer is free to user
 */
 
 // 1. Free block list 
@@ -22,7 +26,6 @@ Arena * mmap_arena  = NULL;
 
 static void memoryAllocation(size_t size);
 static void removeNode(Block* b);
-static void replaceNode(Block * o_node, Block* n_node);
 
 // ! Multiple of 256 MB
 size_t memAlign(size_t chunk, size_t alignment){
@@ -38,14 +41,18 @@ void * searchBlock(size_t size){
   // ! 1. Traverse free list and find best fit blocks
   Block * best = NULL;
 
-  // ! Include the Metadata size
-  size_t required_size = size + kMetadataSize;
+  // ! We need to ensure kMetadataSize + Minallocation size since we need the next and prev later
+  //   when we free the block
+
+  size_t user_request_size  = size + kAllocMetadataSize;
+  size_t minimum_alloc_size = kMinAllocationSize + kMetadataSize;
+  size_t required_size      = user_request_size > minimum_alloc_size ? user_request_size : minimum_alloc_size;
 
   // ! Linear Time to find best fit
   while (node){
-      if (node->size >= required_size){
+      if (GET_SIZE(node) >= required_size){
           if (best){
-              if (best->size > node->size) 
+              if (GET_SIZE(best) > GET_SIZE(node)) 
                   best = node;
           }else best = node;
       }
@@ -53,32 +60,39 @@ void * searchBlock(size_t size){
   }
   // ! 1. Find Large Enough Blocks
   if (best){
-    if (best->size > required_size){
+    if (GET_SIZE(best) > required_size){
           // ! Leftover > Minimum Size (Split)
-          size_t leftover = best->size - required_size;
+          size_t leftover = GET_SIZE(best) - required_size;
           if (leftover >= (kMinAllocationSize + kMetadataSize)){
+              removeNode(best);
+
               Block * nBlock    = (Block *)((char *)best + required_size);
               nBlock->size      = leftover;
-              SET_ALLOC_BIT(nBlock);
-              best->size        = required_size;
+              nBlock->next      = nBlock->prev = NULL;
+              CLEAR_ALLOC_BIT(nBlock);
 
-              // ！ replace node
-              replaceNode(best,nBlock);
+              if (freeList){
+                 nBlock->next   = freeList;
+                 freeList->prev = nBlock;
+              }
+              freeList = nBlock;
+
+              best->size = required_size;
               SET_ALLOC_BIT(best);
-              return (void *)((char *)(best) + kMetadataSize);
+              return (void *)((char *)(best) + kAllocMetadataSize);
           }
           // ! LeftOver < Minimum Size (Allocated)
           else{
               removeNode(best);
               SET_ALLOC_BIT(best);
-              return (void *)((char *)(best) + kMetadataSize);
+              return (void *)((char *)(best) + kAllocMetadataSize);
           }
       }
       // ! Best Size == Required Size (Perfect)
       else{
         removeNode(best);
         SET_ALLOC_BIT(best);
-        return (void *)((char *)(best) + kMetadataSize);
+        return (void *)((char *)(best) + kAllocMetadataSize);
       }
     }
 
@@ -116,12 +130,11 @@ static void memoryAllocation(size_t size){
       endfence->size         = 0;
       SET_ALLOC_BIT(endfence);
 
-
       // 3. Free region
       freeregion->size       = size - (kMetadataSize) - sizeof(Arena);
-      CLEAR_ALLOC_BIT(freeregion);
       freeregion->prev       = NULL;
       freeregion->next       = NULL;
+      CLEAR_ALLOC_BIT(freeregion);
 
       if (freeList == NULL){
           freeList = freeregion;
@@ -151,7 +164,7 @@ void *my_malloc(size_t size) {
       // ! 2. < 512 MB
       else if (target_size < (kMaxAllocationSize - kMetadataSize))
           alloc_size = kMaxAllocationSize;
-      // ! 3. 512 MB
+      // ! 3. 1 GB
       else alloc_size = (kMaxAllocationSize << 1);
       memoryAllocation(alloc_size);
   }
@@ -163,19 +176,17 @@ void coalesce(){
     Arena * arena = mmap_arena;
     while (arena){
         Block * blk = (Block *)((char *)arena + sizeof(Arena));
-        while (blk->size != 0){
-            Block * r_blk = (Block *)((char *)blk + blk->size);
-            if (r_blk->size == 0) 
+        while (GET_SIZE(blk) != 0){
+            Block * r_blk = (Block *)((char *)blk + GET_SIZE(blk));
+            if (GET_SIZE(r_blk) == 0) 
                 break;
             if (is_free(blk) && is_free(r_blk)){
                 removeNode(blk);
                 removeNode(r_blk);
 
-                blk->size += r_blk->size;
+                blk->size += GET_SIZE(r_blk);
                 blk->next = freeList;
                 blk->prev = NULL;
-                CLEAR_ALLOC_BIT(blk);
-
                 if (freeList) 
                     freeList->prev = blk;
                 freeList  = blk;
@@ -195,7 +206,7 @@ void my_free(void *ptr) {
     if (mmap_arena == NULL)
         return;
 
-    Block * m_data = (Block *)((char *)ptr - kMetadataSize);
+    Block * m_data = (Block *)((char *)ptr - kAllocMetadataSize);
     if (is_free(m_data))
         return;
 
@@ -225,12 +236,12 @@ void my_free(void *ptr) {
 
 /* Returns 1 if the given block is free, 0 if not. */
 int is_free(Block *block) {
-  return ((size_t) block & 1) > 0;
+  return (block->size & 1) == 0;
 }
 
 /* Returns the size of the given block */
 size_t block_size(Block *block) {
-  return block->size;
+  return GET_SIZE(block);
 }
 
 /* Returns the first block in memory (excluding fenceposts) */
@@ -243,9 +254,9 @@ Block *get_start_block(void) {
 Block *get_next_block(Block *block) {
     if (!block) return NULL;
 
-    Block * next_block = (Block *) ((char *) block + block->size);
+    Block * next_block = (Block *) ((char *) block + GET_SIZE(block));
     
-    if (next_block->size == 0){
+    if (GET_SIZE(next_block) == 0){
         Arena * arena = mmap_arena;
         while (arena){
             size_t a_start = (size_t)arena;
@@ -263,10 +274,10 @@ Block *get_next_block(Block *block) {
     return next_block;
 }
 
-/* Given a ptr assumed to be returned from a previous call to `alloc`,
+/* Given a ptr assumed to be returned from a previous call to `malloc`,
    return a pointer to the start of the metadata block. */
 Block *ptr_to_block(void *ptr) {
-  return ADD_BYTES(ptr, -((ssize_t) kMetadataSize));
+  return ADD_BYTES(ptr, -((ssize_t) kAllocMetadataSize));
 }
 
 static void removeNode(Block* b) {
@@ -277,23 +288,4 @@ static void removeNode(Block* b) {
         if (freeList) freeList->prev = NULL;
     }
     b->next = b->prev = NULL;
-}
-
-static void replaceNode(Block * o_node, Block* n_node){
-  if (!o_node || !n_node) return;
-
-  if (o_node->prev) {
-      o_node->prev->next = n_node;
-      n_node->prev       = o_node->prev;
-  }
-  if (o_node->next) {
-      o_node->next->prev = n_node;
-      n_node->next       = o_node->next;
-  } 
-
-  if (o_node == freeList){
-      freeList       = n_node;
-      freeList->prev = NULL;
-  }
-  o_node->prev = o_node->next = NULL;
 }

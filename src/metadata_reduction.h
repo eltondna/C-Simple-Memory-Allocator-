@@ -17,6 +17,7 @@
 #define ADD_BYTES(ptr, n) ((void *) (((char *) (ptr)) + (n)))
 #define SET_ALLOC_BIT(ptr) (ptr->size |= 1)
 #define CLEAR_ALLOC_BIT(ptr) (ptr->size &= (~1))
+#define GET_SIZE(ptr)(ptr->size & ~7)
 
 
 /** This is the Block struct, which contains all metadata needed for your 
@@ -49,6 +50,8 @@ extern const size_t kMetadataSize;
 extern const size_t kMaxAllocationSize;
 // Memory size that is mmapped (256 MB)
 extern const size_t kMemorySize;
+// Size of allocated meta-data per allocated Block
+extern const size_t kAllocMetadataSize ;
 
 void *my_malloc(size_t size);
 void my_free(void *p);
